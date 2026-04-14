@@ -108,8 +108,9 @@ export class HighlightService {
 			highlights.sort((a, b) => {
 				const aVol = a.content.volumeIndex;
 				const bVol = b.content.volumeIndex;
-				if (aVol != null && bVol != null && aVol !== bVol)
-					return aVol - bVol;
+				if (aVol != null && bVol != null) return aVol - bVol;
+				if (aVol != null) return -1;
+				if (bVol != null) return 1;
 				return a.content.contentId.localeCompare(b.content.contentId);
 			});
 		}
@@ -224,8 +225,9 @@ export class HighlightService {
 			if (sortByChapterOrder) {
 				const aVol = a.content.volumeIndex;
 				const bVol = b.content.volumeIndex;
-				if (aVol != null && bVol != null && aVol !== bVol)
-					return aVol - bVol;
+				if (aVol != null && bVol != null) return aVol - bVol;
+				if (aVol != null) return -1;
+				if (bVol != null) return 1;
 				return a.content.contentId.localeCompare(b.content.contentId);
 			}
 			return 0;
