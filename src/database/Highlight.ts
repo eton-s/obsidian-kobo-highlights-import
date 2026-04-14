@@ -382,11 +382,16 @@ export class HighlightService {
 		const contentToSection = new Map<string, string | null>();
 		let currentSection: string | null = null;
 
+		// Matches titles that are raw filenames (e.g. "section1.xhtml", "ch01.htm").
+		// These are EPUB file-level container entries, not meaningful section headers.
+		const filenamePattern = /\.(x?html?|ncx|opf|xml|css|epub)$/i;
+
 		for (const entry of spineItems) {
 			const isContainer = entry.chapterIdBookmarked == null;
 			const isNotChapter = !chapterTitles.has(entry.title);
+			const isNotFilename = !filenamePattern.test(entry.title);
 
-			if (isContainer && isNotChapter) {
+			if (isContainer && isNotChapter && isNotFilename) {
 				currentSection = entry.title;
 				sectionHeaderTitles.add(entry.title);
 			}
