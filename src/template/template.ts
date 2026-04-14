@@ -1,5 +1,6 @@
 import { Eta } from "eta";
-import { BookDetails, BookSection, ReadStatus } from "../database/interfaces";
+import { BookDetails, Bookmark, ReadStatus } from "../database/interfaces";
+import { chapter } from "../database/Highlight";
 
 const eta = new Eta({ autoEscape: false, autoTrim: false });
 
@@ -25,13 +26,8 @@ timeSpentReading: <%= it.bookDetails.timeSpentReading ?? '' %>
 
 ## Highlights
 
-<% it.sections.forEach(function({ title, chapters }) { -%>
-<% if (title) { -%>
-### <%= title %>
-
-<% } -%>
-<% chapters.forEach(function([chapterName, highlights]) { -%>
-<%= title ? '####' : '###' %> <%= chapterName.trim() %>
+<% it.chapters.forEach(function([chapterName, highlights]) { -%>
+### <%= chapterName.trim() %>
 
 <% highlights.forEach(function(highlight) { -%>
 <%= highlight.text %>
@@ -44,7 +40,6 @@ timeSpentReading: <%= it.bookDetails.timeSpentReading ?? '' %>
 *<%= highlight.dateCreated.toISOString() %>*
 
 <% } -%>
-<% }) -%>
 <% }) -%>
 <% }) %>
 `;
@@ -52,13 +47,8 @@ timeSpentReading: <%= it.bookDetails.timeSpentReading ?? '' %>
 export const defaultAppendTemplate = `
 ## Highlights
 
-<% it.sections.forEach(function({ title, chapters }) { -%>
-<% if (title) { -%>
-### <%= title %>
-
-<% } -%>
-<% chapters.forEach(function([chapterName, highlights]) { -%>
-<%= title ? '####' : '###' %> <%= chapterName.trim() %>
+<% it.chapters.forEach(function([chapterName, highlights]) { -%>
+### <%= chapterName.trim() %>
 
 <% highlights.forEach(function(highlight) { -%>
 <%= highlight.text %>
@@ -72,23 +62,17 @@ export const defaultAppendTemplate = `
 
 <% } -%>
 <% }) -%>
-<% }) -%>
 <% }) %>
 `;
 
 export function applyTemplateTransformations(
 	rawTemplate: string,
-	sections: BookSection[],
+	chapters: Map<chapter, Bookmark[]>,
 	bookDetails: BookDetails,
 ): string {
-	// Flat chapters array kept for backward compatibility with custom templates
-	// that use `it.chapters` instead of `it.sections`.
-	const chaptersArr = sections.flatMap((s) => s.chapters);
-
 	const rendered = eta.renderString(rawTemplate, {
 		bookDetails,
-		chapters: chaptersArr,
-		sections,
+		chapters: [...chapters.entries()],
 		ReadStatus,
 	});
 

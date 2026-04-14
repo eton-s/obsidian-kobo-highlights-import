@@ -62,12 +62,10 @@ export class AppendHighlightsModal extends Modal {
 			return;
 		}
 
-		const [allContents, details] = await Promise.all([
-			service.getAllContentByBookTitle(bookTitle),
+		const [chapters, details] = await Promise.all([
+			Promise.resolve(service.buildChapterMapWithDedup(highlights)),
 			service.getBookDetailsFromBookTitle(bookTitle),
 		]);
-
-		const sections = service.buildSections(highlights, allContents);
 
 		const template = await getTemplateContents(
 			this.app,
@@ -77,7 +75,7 @@ export class AppendHighlightsModal extends Modal {
 
 		const rendered = applyTemplateTransformations(
 			template,
-			sections,
+			chapters,
 			details,
 		);
 

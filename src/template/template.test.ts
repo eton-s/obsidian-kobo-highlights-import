@@ -1,39 +1,34 @@
 import * as chai from "chai";
 import { applyTemplateTransformations, defaultTemplate } from "./template";
-import { BookSection, Bookmark } from "../database/interfaces";
+import { Bookmark } from "../database/interfaces";
 
 describe("template", async function () {
 	const testDate = new Date("2023-01-01T12:00:00Z");
-	const sections: BookSection[] = [
-		{
-			title: null,
-			chapters: [
-				[
-					"Chapter 1",
-					[
-						{
-							bookmarkId: "1",
-							text: "test",
-							contentId: "content1",
-							dateCreated: testDate,
-						},
-					],
-				],
-				[
-					"Chapter 2",
-					[
-						{
-							bookmarkId: "1",
-							text: "test2",
-							contentId: "content2",
-							dateCreated: testDate,
-							note: "note2",
-						},
-					],
-				],
+	const chapters = new Map<string, Bookmark[]>([
+		[
+			"Chapter 1",
+			[
+				{
+					bookmarkId: "1",
+					text: "test",
+					contentId: "content1",
+					dateCreated: testDate,
+				},
 			],
-		},
-	];
+		],
+		[
+			"Chapter 2",
+			[
+				{
+					bookmarkId: "1",
+					text: "test2",
+					contentId: "content2",
+					dateCreated: testDate,
+					note: "note2",
+				},
+			],
+		],
+	]);
 
 	function normalize(s: string) {
 		return s
@@ -47,7 +42,7 @@ describe("template", async function () {
 	it("applyTemplateTransformations default", async function () {
 		const content = applyTemplateTransformations(
 			defaultTemplate,
-			sections,
+			chapters,
 			{
 				title: "test title",
 				author: "test",
@@ -207,7 +202,7 @@ test2
 		it(`applyTemplateTransformations ${title}`, async function () {
 			const content = applyTemplateTransformations(
 				template,
-				sections,
+				chapters,
 				{
 					title: "test title",
 					author: "test",
@@ -217,52 +212,41 @@ test2
 		});
 	}
 
-	it("applyTemplateTransformations with sections", async function () {
-		const sectioned: BookSection[] = [
-			{
-				title: "Part One",
-				chapters: [
-					[
-						"Chapter 1",
-						[
-							{
-								bookmarkId: "1",
-								text: "highlight in part one",
-								contentId: "c1",
-								dateCreated: testDate,
-							},
-						],
-					],
+	it("applyTemplateTransformations with dedup chapters", async function () {
+		const dedupChapters = new Map<string, Bookmark[]>([
+			[
+				"Chapter 1",
+				[
+					{
+						bookmarkId: "1",
+						text: "highlight in part one",
+						contentId: "c1",
+						dateCreated: testDate,
+					},
 				],
-			},
-			{
-				title: "Part Two",
-				chapters: [
-					[
-						"Chapter 1",
-						[
-							{
-								bookmarkId: "2",
-								text: "highlight in part two",
-								contentId: "c2",
-								dateCreated: testDate,
-							},
-						],
-					],
+			],
+			[
+				"Chapter 1 (2)",
+				[
+					{
+						bookmarkId: "2",
+						text: "highlight in part two",
+						contentId: "c2",
+						dateCreated: testDate,
+					},
 				],
-			},
-		];
+			],
+		]);
 
 		const content = applyTemplateTransformations(
 			defaultTemplate,
-			sectioned,
+			dedupChapters,
 			{ title: "1984", author: "George Orwell" },
 		);
 
 		const normalized = normalize(content);
-		chai.expect(normalized).to.include("### Part One");
-		chai.expect(normalized).to.include("#### Chapter 1");
-		chai.expect(normalized).to.include("### Part Two");
+		chai.expect(normalized).to.include("### Chapter 1");
+		chai.expect(normalized).to.include("### Chapter 1 (2)");
 		chai.expect(normalized).to.include("highlight in part one");
 		chai.expect(normalized).to.include("highlight in part two");
 	});

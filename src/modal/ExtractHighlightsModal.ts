@@ -5,7 +5,7 @@ import { sanitize } from "sanitize-filename-ts";
 import SqlJs from "sql.js";
 import { binary } from "src/binaries/sql-wasm";
 import { HighlightService } from "src/database/Highlight";
-import { BookSection, Highlight } from "src/database/interfaces";
+import { Highlight } from "src/database/interfaces";
 import { Repository } from "src/database/repository";
 import { KoboHighlightsImporterSettings } from "src/settings/Settings";
 import { applyTemplateTransformations } from "src/template/template";
@@ -90,19 +90,16 @@ export class ExtractHighlightsModal extends Modal {
 				`${this.settings.storageFolder}/${sanitizedBookName}.md`,
 			);
 
-			const [allContents, details] = await Promise.all([
-				service.getAllContentByBookTitle(bookTitle),
+			const [chapters, details] = await Promise.all([
+				Promise.resolve(
+					service.buildChapterMapWithDedup(bookHighlights),
+				),
 				service.getBookDetailsFromBookTitle(bookTitle),
 			]);
 
-			const sections: BookSection[] = service.buildSections(
-				bookHighlights,
-				allContents,
-			);
-
 			await this.app.vault.adapter.write(
 				fileName,
-				applyTemplateTransformations(template, sections, details),
+				applyTemplateTransformations(template, chapters, details),
 			);
 		}
 	}
