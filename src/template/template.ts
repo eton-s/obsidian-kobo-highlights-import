@@ -1,5 +1,5 @@
 import { Eta } from "eta";
-import { BookDetails, ReadStatus, Bookmark } from "../database/interfaces";
+import { BookDetails, Bookmark, ReadStatus } from "../database/interfaces";
 import { chapter } from "../database/Highlight";
 
 const eta = new Eta({ autoEscape: false, autoTrim: false });
@@ -26,10 +26,10 @@ timeSpentReading: <%= it.bookDetails.timeSpentReading ?? '' %>
 
 ## Highlights
 
-<% it.chapters.forEach(([chapterName, highlights]) => { -%>
-## <%= chapterName.trim() %>
+<% it.chapters.forEach(function([chapterName, highlights]) { -%>
+### <%= chapterName.trim() %>
 
-<% highlights.forEach((highlight) => { -%>
+<% highlights.forEach(function(highlight) { -%>
 <%= highlight.text %>
 
 <% if (highlight.note) { -%>
@@ -47,10 +47,10 @@ timeSpentReading: <%= it.bookDetails.timeSpentReading ?? '' %>
 export const defaultAppendTemplate = `
 ## Highlights
 
-<% it.chapters.forEach(([chapterName, highlights]) => { -%>
+<% it.chapters.forEach(function([chapterName, highlights]) { -%>
 ### <%= chapterName.trim() %>
 
-<% highlights.forEach((highlight) => { -%>
+<% highlights.forEach(function(highlight) { -%>
 <%= highlight.text %>
 
 <% if (highlight.note) { -%>
@@ -70,10 +70,9 @@ export function applyTemplateTransformations(
 	chapters: Map<chapter, Bookmark[]>,
 	bookDetails: BookDetails,
 ): string {
-	const chaptersArr = Array.from(chapters.entries());
 	const rendered = eta.renderString(rawTemplate, {
 		bookDetails,
-		chapters: chaptersArr,
+		chapters: [...chapters.entries()],
 		ReadStatus,
 	});
 

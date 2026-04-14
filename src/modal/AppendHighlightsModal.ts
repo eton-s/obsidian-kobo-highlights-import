@@ -62,17 +62,10 @@ export class AppendHighlightsModal extends Modal {
 			return;
 		}
 
-		const contentMap = service.convertToMap(highlights);
-		const chapters = contentMap.get(bookTitle);
-
-		if (!chapters) {
-			new Notice(
-				`No highlights found for "${bookTitle}" in the Kobo database`,
-			);
-			return;
-		}
-
-		const details = await service.getBookDetailsFromBookTitle(bookTitle);
+		const [chapters, details] = await Promise.all([
+			Promise.resolve(service.buildChapterMapWithDedup(highlights)),
+			service.getBookDetailsFromBookTitle(bookTitle),
+		]);
 
 		const template = await getTemplateContents(
 			this.app,

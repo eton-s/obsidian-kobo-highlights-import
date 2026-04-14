@@ -1,11 +1,10 @@
 import * as chai from "chai";
 import { applyTemplateTransformations, defaultTemplate } from "./template";
-import { chapter } from "../database/Highlight";
 import { Bookmark } from "../database/interfaces";
 
 describe("template", async function () {
 	const testDate = new Date("2023-01-01T12:00:00Z");
-	const chapters = new Map<chapter, Bookmark[]>([
+	const chapters = new Map<string, Bookmark[]>([
 		[
 			"Chapter 1",
 			[
@@ -17,7 +16,6 @@ describe("template", async function () {
 				},
 			],
 		],
-
 		[
 			"Chapter 2",
 			[
@@ -55,14 +53,14 @@ describe("template", async function () {
 				`---
 title: "test title"
 author: test
-publisher: 
-dateLastRead: 
+publisher:
+dateLastRead:
 readStatus: Unknown
-percentRead: 
-isbn: 
-series: 
-seriesNumber: 
-timeSpentReading: 
+percentRead:
+isbn:
+series:
+seriesNumber:
+timeSpentReading:
 ---
 
 # test title
@@ -73,24 +71,24 @@ timeSpentReading:
 
 ## Highlights
 
-## Chapter 1
+### Chapter 1
 
 test
 
-*Created: 2023-01-01T12:00:00.000Z*
+*2023-01-01T12:00:00.000Z*
 
-## Chapter 2
+### Chapter 2
 
 test2
 
 **Note:** note2
 
-*Created: 2023-01-01T12:00:00.000Z*`,
+*2023-01-01T12:00:00.000Z*`,
 			),
 		);
 	});
 
-	const templates = new Map<string, string[]>([
+	const templates = new Map<string, [string, string]>([
 		[
 			"default",
 			[
@@ -98,14 +96,14 @@ test2
 				`---
 title: "test title"
 author: test
-publisher: 
-dateLastRead: 
+publisher:
+dateLastRead:
 readStatus: Unknown
-percentRead: 
-isbn: 
-series: 
-seriesNumber: 
-timeSpentReading: 
+percentRead:
+isbn:
+series:
+seriesNumber:
+timeSpentReading:
 ---
 
 # test title
@@ -116,19 +114,19 @@ timeSpentReading:
 
 ## Highlights
 
-## Chapter 1
+### Chapter 1
 
 test
 
-*Created: 2023-01-01T12:00:00.000Z*
+*2023-01-01T12:00:00.000Z*
 
-## Chapter 2
+### Chapter 2
 
 test2
 
 **Note:** note2
 
-*Created: 2023-01-01T12:00:00.000Z*`,
+*2023-01-01T12:00:00.000Z*`,
 			],
 		],
 		[
@@ -200,13 +198,56 @@ test2
 		],
 	]);
 
-	for (const [title, t] of templates) {
+	for (const [title, [template, expected]] of templates) {
 		it(`applyTemplateTransformations ${title}`, async function () {
-			const content = applyTemplateTransformations(t[0], chapters, {
-				title: "test title",
-				author: "test",
-			});
-			chai.expect(normalize(content)).equal(normalize(t[1]));
+			const content = applyTemplateTransformations(
+				template,
+				chapters,
+				{
+					title: "test title",
+					author: "test",
+				},
+			);
+			chai.expect(normalize(content)).equal(normalize(expected));
 		});
 	}
+
+	it("applyTemplateTransformations with dedup chapters", async function () {
+		const dedupChapters = new Map<string, Bookmark[]>([
+			[
+				"Chapter 1",
+				[
+					{
+						bookmarkId: "1",
+						text: "highlight in part one",
+						contentId: "c1",
+						dateCreated: testDate,
+					},
+				],
+			],
+			[
+				"Chapter 1 (2)",
+				[
+					{
+						bookmarkId: "2",
+						text: "highlight in part two",
+						contentId: "c2",
+						dateCreated: testDate,
+					},
+				],
+			],
+		]);
+
+		const content = applyTemplateTransformations(
+			defaultTemplate,
+			dedupChapters,
+			{ title: "1984", author: "George Orwell" },
+		);
+
+		const normalized = normalize(content);
+		chai.expect(normalized).to.include("### Chapter 1");
+		chai.expect(normalized).to.include("### Chapter 1 (2)");
+		chai.expect(normalized).to.include("highlight in part one");
+		chai.expect(normalized).to.include("highlight in part two");
+	});
 });

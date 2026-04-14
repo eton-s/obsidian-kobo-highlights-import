@@ -108,8 +108,9 @@ export class HighlightService {
 			highlights.sort((a, b) => {
 				const aVol = a.content.volumeIndex;
 				const bVol = b.content.volumeIndex;
-				if (aVol != null && bVol != null && aVol !== bVol)
-					return aVol - bVol;
+				if (aVol != null && bVol != null) return aVol - bVol;
+				if (aVol != null) return -1;
+				if (bVol != null) return 1;
 				return a.content.contentId.localeCompare(b.content.contentId);
 			});
 		}
@@ -224,8 +225,9 @@ export class HighlightService {
 			if (sortByChapterOrder) {
 				const aVol = a.content.volumeIndex;
 				const bVol = b.content.volumeIndex;
-				if (aVol != null && bVol != null && aVol !== bVol)
-					return aVol - bVol;
+				if (aVol != null && bVol != null) return aVol - bVol;
+				if (aVol != null) return -1;
+				if (bVol != null) return 1;
 				return a.content.contentId.localeCompare(b.content.contentId);
 			}
 			return 0;
@@ -330,5 +332,35 @@ export class HighlightService {
 	// Create an empty content map for books without highlights
 	createEmptyContentMap(): Map<chapter, Bookmark[]> {
 		return new Map<chapter, Bookmark[]>();
+	}
+
+	// Groups sorted highlights for a single book into a chapter map.
+	//
+	// Highlights must be pre-sorted in reading order (by VolumeIndex). When the
+	// same chapter title appears under different content entries (e.g. "Chapter 1"
+	// in Part One and "Chapter 1" in Part Two of 1984), each distinct contentId
+	// gets its own map key. The second occurrence is named "Chapter 1 (2)", the
+	// third "Chapter 1 (3)", and so on, so highlights are never silently merged.
+	buildChapterMapWithDedup(highlights: Highlight[]): Map<chapter, Bookmark[]> {
+		const chapterMap = new Map<chapter, Bookmark[]>();
+		const contentIdToKey = new Map<string, string>();
+		const titleCount = new Map<string, number>();
+
+		for (const h of highlights) {
+			const { title, contentId } = h.content;
+			let key = contentIdToKey.get(contentId);
+
+			if (key === undefined) {
+				const count = (titleCount.get(title) ?? 0) + 1;
+				titleCount.set(title, count);
+				key = count === 1 ? title : `${title} (${count})`;
+				contentIdToKey.set(contentId, key);
+				chapterMap.set(key, []);
+			}
+
+			chapterMap.get(key)!.push(h.bookmark);
+		}
+
+		return chapterMap;
 	}
 }
