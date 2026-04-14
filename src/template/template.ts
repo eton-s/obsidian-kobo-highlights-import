@@ -27,11 +27,11 @@ timeSpentReading: <%= it.bookDetails.timeSpentReading ?? '' %>
 
 <% it.sections.forEach(function({ title, chapters }) { -%>
 <% if (title) { -%>
-## <%= title %>
+### <%= title %>
 
 <% } -%>
 <% chapters.forEach(function([chapterName, highlights]) { -%>
-<%= title ? '###' : '##' %> <%= chapterName.trim() %>
+<%= title ? '####' : '###' %> <%= chapterName.trim() %>
 
 <% highlights.forEach(function(highlight) { -%>
 <%= highlight.text %>

@@ -336,12 +336,15 @@ export class HighlightService {
 
 	// Groups sorted highlights into sections using the content table's structure.
 	//
-	// A "section header" is a content entry whose title appears exactly once among
-	// bookmarkable entries AND is immediately followed (by VolumeIndex) by an entry
-	// whose title appears multiple times. This reliably identifies Part/Book headings
-	// in EPUBs like 1984 where each Part contains chapters named "Chapter 1", etc.
+	// Section headers are spine items (volumeIndex != null) that are structural
+	// containers rather than bookmarkable chapters (chapterIdBookmarked == null)
+	// and whose title does not also appear as a bookmarkable chapter title.
+	// This reliably identifies Part/Book headings (e.g. "Part One") in any EPUB
+	// without requiring duplicate chapter names as a prerequisite.
 	//
-	// When no titles repeat, returns a single null-titled section (flat chapter list).
+	// A section is only emitted when it contains at least one highlighted chapter.
+	// If no section headers are found in the content table, returns a single
+	// null-titled section (flat chapter list, same rendering as before).
 	buildSections(
 		highlights: Highlight[],
 		allContents: Content[],
@@ -350,18 +353,49 @@ export class HighlightService {
 			return [{ title: null, chapters: [] }];
 		}
 
-		// Count title occurrences among bookmarkable content entries.
-		const titleCount = new Map<string, number>();
-		for (const c of allContents) {
-			if (c.chapterIdBookmarked != null) {
-				titleCount.set(c.title, (titleCount.get(c.title) ?? 0) + 1);
+		// Titles that appear as bookmarkable chapter entries — used to distinguish
+		// chapter entries from structural container entries (Parts, Books, etc.).
+		const chapterTitles = new Set(
+			allContents
+				.filter((c) => c.chapterIdBookmarked != null)
+				.map((c) => c.title),
+		);
+
+		// Sort all spine items (volumeIndex != null) by reading order.
+		// This includes both bookmarkable chapters and non-bookmarkable containers.
+		const spineItems = allContents
+			.filter((c) => c.volumeIndex != null)
+			.sort((a, b) => {
+				if (a.volumeIndex != null && b.volumeIndex != null)
+					return a.volumeIndex - b.volumeIndex;
+				if (a.volumeIndex != null) return -1;
+				if (b.volumeIndex != null) return 1;
+				return a.contentId.localeCompare(b.contentId);
+			});
+
+		// Scan spine items in reading order to detect section headers and assign
+		// each content entry to its containing section.
+		//
+		// A section header is a non-bookmarkable spine item whose title does not
+		// appear as a chapter title — i.e. it is a structural container (Part, Book).
+		const sectionHeaderTitles = new Set<string>();
+		const contentToSection = new Map<string, string | null>();
+		let currentSection: string | null = null;
+
+		for (const entry of spineItems) {
+			const isContainer = entry.chapterIdBookmarked == null;
+			const isNotChapter = !chapterTitles.has(entry.title);
+
+			if (isContainer && isNotChapter) {
+				currentSection = entry.title;
+				sectionHeaderTitles.add(entry.title);
 			}
+
+			contentToSection.set(entry.contentId, currentSection);
 		}
 
-		const hasDuplicates = [...titleCount.values()].some((n) => n > 1);
-
-		if (!hasDuplicates) {
-			// No repeated chapter titles — return a flat, unsectioned chapter list.
+		// If no section headers were found, return a flat unsectioned chapter list.
+		if (sectionHeaderTitles.size === 0) {
 			const chapterMap = new Map<string, Bookmark[]>();
 			for (const h of highlights) {
 				if (!chapterMap.has(h.content.title))
@@ -371,50 +405,18 @@ export class HighlightService {
 			return [{ title: null, chapters: [...chapterMap.entries()] }];
 		}
 
-		const repeatedTitles = new Set(
-			[...titleCount.entries()]
-				.filter(([, n]) => n > 1)
-				.map(([t]) => t),
-		);
-
-		// Sort bookmarkable entries by VolumeIndex (nulls last), then contentId.
-		const sorted = allContents
-			.filter((c) => c.chapterIdBookmarked != null)
-			.sort((a, b) => {
-				if (a.volumeIndex != null && b.volumeIndex != null)
-					return a.volumeIndex - b.volumeIndex;
-				if (a.volumeIndex != null) return -1;
-				if (b.volumeIndex != null) return 1;
-				return a.contentId.localeCompare(b.contentId);
-			});
-
-		// Detect section headers and assign every content entry to its section.
-		const sectionHeaderTitles = new Set<string>();
-		const contentToSection = new Map<string, string | null>();
-		let currentSection: string | null = null;
-
-		for (let i = 0; i < sorted.length; i++) {
-			const entry = sorted[i];
-			const next = sorted[i + 1] ?? null;
-			const isUnique = !repeatedTitles.has(entry.title);
-			const nextIsRepeated =
-				next != null && repeatedTitles.has(next.title);
-
-			if (isUnique && nextIsRepeated) {
-				currentSection = entry.title;
-				sectionHeaderTitles.add(entry.title);
-			}
-
-			contentToSection.set(entry.contentId, currentSection);
-		}
-
 		// Group highlights into sections, preserving VolumeIndex-sorted order.
+		// Sections with no highlighted chapters are omitted automatically (they
+		// never appear in sectionOrder because no highlight maps to them).
 		const sectionOrder: (string | null)[] = [];
-		const sectionChapters = new Map<string | null, Map<string, Bookmark[]>>();
+		const sectionChapters = new Map<
+			string | null,
+			Map<string, Bookmark[]>
+		>();
 
 		for (const h of highlights) {
-			// Highlights whose content IS the section header are skipped — they
-			// have no chapter to belong to and are not meaningful to display.
+			// Skip highlights whose resolved content entry is a section header
+			// (rare — would mean a user highlighted text inside a Part heading).
 			if (sectionHeaderTitles.has(h.content.title)) continue;
 
 			const sectionKey =
@@ -433,7 +435,9 @@ export class HighlightService {
 
 		return sectionOrder.map((title) => ({
 			title,
-			chapters: [...(sectionChapters.get(title) ?? new Map()).entries()],
+			chapters: [
+				...(sectionChapters.get(title) ?? new Map()).entries(),
+			],
 		}));
 	}
 }

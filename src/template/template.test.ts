@@ -76,13 +76,13 @@ timeSpentReading:
 
 ## Highlights
 
-## Chapter 1
+### Chapter 1
 
 test
 
 *2023-01-01T12:00:00.000Z*
 
-## Chapter 2
+### Chapter 2
 
 test2
 
@@ -119,13 +119,13 @@ timeSpentReading:
 
 ## Highlights
 
-## Chapter 1
+### Chapter 1
 
 test
 
 *2023-01-01T12:00:00.000Z*
 
-## Chapter 2
+### Chapter 2
 
 test2
 
@@ -260,9 +260,9 @@ test2
 		);
 
 		const normalized = normalize(content);
-		chai.expect(normalized).to.include("## Part One");
-		chai.expect(normalized).to.include("### Chapter 1");
-		chai.expect(normalized).to.include("## Part Two");
+		chai.expect(normalized).to.include("### Part One");
+		chai.expect(normalized).to.include("#### Chapter 1");
+		chai.expect(normalized).to.include("### Part Two");
 		chai.expect(normalized).to.include("highlight in part one");
 		chai.expect(normalized).to.include("highlight in part two");
 	});
