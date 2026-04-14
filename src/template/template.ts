@@ -37,7 +37,7 @@ timeSpentReading: <%= it.bookDetails.timeSpentReading ?? '' %>
 
 <% } -%>
 <% if (highlight.dateCreated) { -%>
-*Created: <%= highlight.dateCreated.toISOString() %>*
+*<%= highlight.dateCreated.toISOString() %>*
 
 <% } -%>
 <% }) -%>
@@ -58,7 +58,7 @@ export const defaultAppendTemplate = `
 
 <% } -%>
 <% if (highlight.dateCreated) { -%>
-*Created: <%= highlight.dateCreated.toISOString() %>*
+*<%= highlight.dateCreated.toISOString() %>*
 
 <% } -%>
 <% }) -%>

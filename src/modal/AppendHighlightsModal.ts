@@ -1,3 +1,5 @@
+import { webUtils } from "electron";
+import { readFileSync } from "fs";
 import { App, Modal, Notice, TFile } from "obsidian";
 import SqlJs from "sql.js";
 import { binary } from "src/binaries/sql-wasm";
@@ -17,6 +19,7 @@ export class AppendHighlightsModal extends Modal {
 	inputFileEl!: HTMLInputElement;
 
 	settings: KoboHighlightsImporterSettings;
+	saveSettings: () => Promise<void>;
 	activeFile: TFile;
 
 	fileBuffer: ArrayBuffer | null | undefined;
@@ -25,9 +28,11 @@ export class AppendHighlightsModal extends Modal {
 		app: App,
 		settings: KoboHighlightsImporterSettings,
 		activeFile: TFile,
+		saveSettings: () => Promise<void>,
 	) {
 		super(app);
 		this.settings = settings;
+		this.saveSettings = saveSettings;
 		this.activeFile = activeFile;
 	}
 
@@ -47,6 +52,7 @@ export class AppendHighlightsModal extends Modal {
 		const highlights = await service.getHighlightsByBookTitle(
 			bookTitle,
 			this.settings.sortByChapterProgress,
+			this.settings.sortByChapterOrder,
 		);
 
 		if (highlights.length === 0) {
@@ -103,7 +109,7 @@ export class AppendHighlightsModal extends Modal {
 		const db = new SQLEngine.Database(new Uint8Array(this.fileBuffer));
 		const service = new HighlightService(new Repository(db));
 
-		// Try ISBN match first
+		// Try ISBN match first.
 		const isbn = this.getFrontmatterValue("isbn");
 		if (isbn) {
 			const bookByIsbn = await service.getBookDetailsByIsbn(isbn);
@@ -113,7 +119,7 @@ export class AppendHighlightsModal extends Modal {
 			}
 		}
 
-		// Fall back to book picker
+		// Fall back to book picker.
 		const noteTitle =
 			this.getFrontmatterValue("title") ?? this.activeFile.basename;
 		const allBooks = await service.getAllBooks();
@@ -139,6 +145,32 @@ export class AppendHighlightsModal extends Modal {
 				}
 			},
 		).open();
+	}
+
+	private enableButton() {
+		this.goButtonEl.disabled = false;
+		this.goButtonEl.setAttr(
+			"style",
+			"background-color: green; color: black",
+		);
+	}
+
+	private tryLoadStoredPath() {
+		if (!this.settings.sqlitePath) return;
+
+		try {
+			const buf = readFileSync(this.settings.sqlitePath);
+			this.fileBuffer = buf.buffer.slice(
+				buf.byteOffset,
+				buf.byteOffset + buf.byteLength,
+			);
+			this.enableButton();
+			new Notice(`Loaded KoboReader.sqlite from remembered path`);
+		} catch {
+			new Notice(
+				`Could not load sqlite file from remembered path — please select it manually`,
+			);
+		}
 	}
 
 	onOpen() {
@@ -172,14 +204,17 @@ export class AppendHighlightsModal extends Modal {
 				return;
 			}
 
+			// Save the path for future sessions using Electron's webUtils API.
+			const filePath = webUtils.getPathForFile(file);
+			if (filePath) {
+				this.settings.sqlitePath = filePath;
+				this.saveSettings();
+			}
+
 			const reader = new FileReader();
 			reader.onload = () => {
 				this.fileBuffer = reader.result as ArrayBuffer;
-				this.goButtonEl.disabled = false;
-				this.goButtonEl.setAttr(
-					"style",
-					"background-color: green; color: black",
-				);
+				this.enableButton();
 				new Notice("Ready to extract!");
 			};
 
@@ -202,6 +237,9 @@ export class AppendHighlightsModal extends Modal {
 		contentEl.appendChild(description);
 		contentEl.appendChild(this.inputFileEl);
 		contentEl.appendChild(this.goButtonEl);
+
+		// Try to auto-load from the remembered path after the UI is shown.
+		this.tryLoadStoredPath();
 	}
 
 	onClose() {

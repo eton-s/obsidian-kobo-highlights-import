@@ -9,16 +9,12 @@ export class Repository {
 	}
 
 	async getAllBookmark(sortByChapterProgress?: boolean): Promise<Bookmark[]> {
-		let res;
-		if (sortByChapterProgress) {
-			res = this.db.exec(
-				`select BookmarkID, Text, ContentID, annotation, DateCreated, ChapterProgress from Bookmark where Text is not null order by ChapterProgress ASC, DateCreated ASC;`,
-			);
-		} else {
-			res = this.db.exec(
-				`select BookmarkID, Text, ContentID, annotation, DateCreated, ChapterProgress from Bookmark where Text is not null order by DateCreated ASC;`,
-			);
-		}
+		const orderBy = sortByChapterProgress
+			? "ChapterProgress ASC, DateCreated ASC"
+			: "DateCreated ASC";
+		const res = this.db.exec(
+			`select BookmarkID, Text, ContentID, annotation, DateCreated, ChapterProgress from Bookmark where Text is not null order by ${orderBy};`,
+		);
 		const bookmarks: Bookmark[] = [];
 
 		if (res[0].values == undefined) {
@@ -49,6 +45,7 @@ export class Repository {
 				contentId: row[2].toString(),
 				note: row[3]?.toString(),
 				dateCreated: new Date(row[4].toString()),
+				spineProgress: row[5] != null ? +row[5] : undefined,
 			});
 		});
 
@@ -155,7 +152,7 @@ export class Repository {
 
 	async getAllContentByBookTitle(bookTitle: string): Promise<Content[]> {
 		const statement = this.db.prepare(
-			`select Title, ContentID, ChapterIDBookmarked, BookTitle  from "content" where BookTitle = $bookTitle`,
+			`select Title, ContentID, ChapterIDBookmarked, BookTitle, VolumeIndex from "content" where BookTitle = $bookTitle`,
 			{ $bookTitle: bookTitle },
 		);
 
@@ -169,7 +166,7 @@ export class Repository {
 		bookTitle: string,
 	): Promise<Content[]> {
 		const statement = this.db.prepare(
-			`select Title, ContentID, ChapterIDBookmarked, BookTitle  from "content" where BookTitle = $bookTitle order by "ContentID"`,
+			`select Title, ContentID, ChapterIDBookmarked, BookTitle, VolumeIndex from "content" where BookTitle = $bookTitle order by "ContentID"`,
 			{ $bookTitle: bookTitle },
 		);
 
@@ -218,6 +215,55 @@ export class Repository {
 			seriesNumber: row[8] ? +row[8].toString() : undefined,
 			timeSpentReading: row[9] ? +row[9].toString() : 0,
 		};
+	}
+
+	async getBookmarksByBookTitle(
+		bookTitle: string,
+		sortByChapterProgress?: boolean,
+	): Promise<Bookmark[]> {
+		const orderBy = sortByChapterProgress
+			? "b.ChapterProgress ASC, b.DateCreated ASC"
+			: "b.DateCreated ASC";
+
+		// Use EXISTS with a parameterized bind to filter bookmarks to this book,
+		// handling both exact ContentID matches and fuzzy matches (where
+		// content.ContentID contains the bookmark's ContentID as a substring).
+		// The ORDER BY clause uses an internally-derived string (not user input)
+		// so interpolating it is safe.
+		const statement = this.db.prepare(
+			`SELECT b.BookmarkID, b.Text, b.ContentID, b.annotation, b.DateCreated, b.ChapterProgress
+			FROM Bookmark b
+			WHERE b.Text IS NOT NULL
+			AND EXISTS (
+				SELECT 1 FROM content c
+				WHERE c.BookTitle = $bookTitle
+				AND (c.ContentID = b.ContentID OR c.ContentID LIKE '%' || b.ContentID || '%')
+			)
+			ORDER BY ${orderBy};`,
+			{ $bookTitle: bookTitle },
+		);
+
+		const bookmarks: Bookmark[] = [];
+
+		while (statement.step()) {
+			const row = statement.get();
+			if (!(row[0] && row[1] && row[2] && row[4])) {
+				console.warn("Skipping bookmark with invalid values", row);
+				continue;
+			}
+
+			bookmarks.push({
+				bookmarkId: row[0].toString(),
+				text: row[1].toString().replace(/\s+/g, " ").trim(),
+				contentId: row[2].toString(),
+				note: row[3]?.toString(),
+				dateCreated: new Date(row[4].toString()),
+				spineProgress: row[5] != null ? +row[5] : undefined,
+			});
+		}
+
+		statement.free();
+		return bookmarks;
 	}
 
 	async getBookDetailsByIsbn(isbn: string): Promise<BookDetails | null> {
@@ -309,6 +355,7 @@ export class Repository {
 				contentId: row[1]?.toString() ?? "",
 				chapterIdBookmarked: row[2]?.toString(),
 				bookTitle: row[3]?.toString(),
+				volumeIndex: row[4] != null ? +row[4] : undefined,
 			});
 		}
 

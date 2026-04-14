@@ -8,7 +8,9 @@ export const DEFAULT_SETTINGS: KoboHighlightsImporterSettings = {
 	sortByChapterProgress: false,
 	templatePath: "",
 	appendTemplatePath: "",
+	sortByChapterOrder: true,
 	importAllBooks: false,
+	sqlitePath: "",
 };
 
 export interface KoboHighlightsImporterSettings {
@@ -16,7 +18,9 @@ export interface KoboHighlightsImporterSettings {
 	sortByChapterProgress: boolean;
 	templatePath: string;
 	appendTemplatePath: string;
+	sortByChapterOrder: boolean;
 	importAllBooks: boolean;
+	sqlitePath: string;
 }
 
 export class KoboHighlightsImporterSettingsTab extends PluginSettingTab {
@@ -32,8 +36,10 @@ export class KoboHighlightsImporterSettingsTab extends PluginSettingTab {
 		this.containerEl.createEl("h2", { text: this.plugin.manifest.name });
 
 		this.add_destination_folder();
+		this.add_sqlite_path();
 		this.add_template_path();
 		this.add_append_template_path();
+		this.add_sort_by_chapter_order();
 		this.add_sort_by_chapter_progress();
 		this.add_import_all_books();
 	}
@@ -50,6 +56,26 @@ export class KoboHighlightsImporterSettingsTab extends PluginSettingTab {
 						this.plugin.settings.storageFolder = newFolder;
 						this.plugin.saveSettings();
 					});
+			});
+	}
+
+	add_sqlite_path(): void {
+		new Setting(this.containerEl)
+			.setName("Kobo SQLite path")
+			.setDesc(
+				"Remembered path to KoboReader.sqlite. Cleared automatically if the file is not found at this location.",
+			)
+			.addText((cb) => {
+				cb.setDisabled(true).setValue(
+					this.plugin.settings.sqlitePath || "(not set)",
+				);
+			})
+			.addButton((cb) => {
+				cb.setButtonText("Clear").onClick(async () => {
+					this.plugin.settings.sqlitePath = "";
+					await this.plugin.saveSettings();
+					this.display();
+				});
 			});
 	}
 
@@ -86,21 +112,36 @@ export class KoboHighlightsImporterSettingsTab extends PluginSettingTab {
 			});
 	}
 
-	add_sort_by_chapter_progress(): void {
-		const desc = document.createDocumentFragment();
-		desc.append(
-			"Turn on to sort highlights by chapter progess. If turned off, highlights are sorted by creation date and time.",
-		);
-
+	add_sort_by_chapter_order(): void {
 		new Setting(this.containerEl)
-			.setName("Sort by chapter progress")
-			.setDesc(desc)
+			.setName("Sort chapters in reading order")
+			.setDesc(
+				"Sort chapters by their position in the book. " +
+				"When disabled, chapters appear in the order you first highlighted in each one.",
+			)
+			.addToggle((cb) => {
+				cb.setValue(
+					this.plugin.settings.sortByChapterOrder,
+				).onChange(async (toggle) => {
+					this.plugin.settings.sortByChapterOrder = toggle;
+					await this.plugin.saveSettings();
+				});
+			});
+	}
+
+	add_sort_by_chapter_progress(): void {
+		new Setting(this.containerEl)
+			.setName("Sort highlights by chapter progress")
+			.setDesc(
+				"Sort highlights by their position within the chapter. " +
+				"When disabled, highlights are sorted by creation date.",
+			)
 			.addToggle((cb) => {
 				cb.setValue(
 					this.plugin.settings.sortByChapterProgress,
-				).onChange((toggle) => {
+				).onChange(async (toggle) => {
 					this.plugin.settings.sortByChapterProgress = toggle;
-					this.plugin.saveSettings();
+					await this.plugin.saveSettings();
 				});
 			});
 	}
