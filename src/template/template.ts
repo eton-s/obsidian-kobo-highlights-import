@@ -1,6 +1,5 @@
 import { Eta } from "eta";
-import { BookDetails, ReadStatus, Bookmark } from "../database/interfaces";
-import { chapter } from "../database/Highlight";
+import { BookDetails, BookSection, ReadStatus } from "../database/interfaces";
 
 const eta = new Eta({ autoEscape: false, autoTrim: false });
 
@@ -26,10 +25,15 @@ timeSpentReading: <%= it.bookDetails.timeSpentReading ?? '' %>
 
 ## Highlights
 
-<% it.chapters.forEach(([chapterName, highlights]) => { -%>
-## <%= chapterName.trim() %>
+<% it.sections.forEach(function({ title, chapters }) { -%>
+<% if (title) { -%>
+## <%= title %>
 
-<% highlights.forEach((highlight) => { -%>
+<% } -%>
+<% chapters.forEach(function([chapterName, highlights]) { -%>
+<%= title ? '###' : '##' %> <%= chapterName.trim() %>
+
+<% highlights.forEach(function(highlight) { -%>
 <%= highlight.text %>
 
 <% if (highlight.note) { -%>
@@ -40,6 +44,7 @@ timeSpentReading: <%= it.bookDetails.timeSpentReading ?? '' %>
 *<%= highlight.dateCreated.toISOString() %>*
 
 <% } -%>
+<% }) -%>
 <% }) -%>
 <% }) %>
 `;
@@ -47,10 +52,15 @@ timeSpentReading: <%= it.bookDetails.timeSpentReading ?? '' %>
 export const defaultAppendTemplate = `
 ## Highlights
 
-<% it.chapters.forEach(([chapterName, highlights]) => { -%>
-### <%= chapterName.trim() %>
+<% it.sections.forEach(function({ title, chapters }) { -%>
+<% if (title) { -%>
+### <%= title %>
 
-<% highlights.forEach((highlight) => { -%>
+<% } -%>
+<% chapters.forEach(function([chapterName, highlights]) { -%>
+<%= title ? '####' : '###' %> <%= chapterName.trim() %>
+
+<% highlights.forEach(function(highlight) { -%>
 <%= highlight.text %>
 
 <% if (highlight.note) { -%>
@@ -62,18 +72,23 @@ export const defaultAppendTemplate = `
 
 <% } -%>
 <% }) -%>
+<% }) -%>
 <% }) %>
 `;
 
 export function applyTemplateTransformations(
 	rawTemplate: string,
-	chapters: Map<chapter, Bookmark[]>,
+	sections: BookSection[],
 	bookDetails: BookDetails,
 ): string {
-	const chaptersArr = Array.from(chapters.entries());
+	// Flat chapters array kept for backward compatibility with custom templates
+	// that use `it.chapters` instead of `it.sections`.
+	const chaptersArr = sections.flatMap((s) => s.chapters);
+
 	const rendered = eta.renderString(rawTemplate, {
 		bookDetails,
 		chapters: chaptersArr,
+		sections,
 		ReadStatus,
 	});
 

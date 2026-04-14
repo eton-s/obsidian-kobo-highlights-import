@@ -62,17 +62,12 @@ export class AppendHighlightsModal extends Modal {
 			return;
 		}
 
-		const contentMap = service.convertToMap(highlights);
-		const chapters = contentMap.get(bookTitle);
+		const [allContents, details] = await Promise.all([
+			service.getAllContentByBookTitle(bookTitle),
+			service.getBookDetailsFromBookTitle(bookTitle),
+		]);
 
-		if (!chapters) {
-			new Notice(
-				`No highlights found for "${bookTitle}" in the Kobo database`,
-			);
-			return;
-		}
-
-		const details = await service.getBookDetailsFromBookTitle(bookTitle);
+		const sections = service.buildSections(highlights, allContents);
 
 		const template = await getTemplateContents(
 			this.app,
@@ -82,7 +77,7 @@ export class AppendHighlightsModal extends Modal {
 
 		const rendered = applyTemplateTransformations(
 			template,
-			chapters,
+			sections,
 			details,
 		);
 

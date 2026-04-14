@@ -1,4 +1,4 @@
-import { BookDetails, Bookmark, Content, Highlight } from "./interfaces";
+import { BookDetails, BookSection, Bookmark, Content, Highlight } from "./interfaces";
 import { Repository } from "./repository";
 
 type bookTitle = string;
@@ -332,5 +332,108 @@ export class HighlightService {
 	// Create an empty content map for books without highlights
 	createEmptyContentMap(): Map<chapter, Bookmark[]> {
 		return new Map<chapter, Bookmark[]>();
+	}
+
+	// Groups sorted highlights into sections using the content table's structure.
+	//
+	// A "section header" is a content entry whose title appears exactly once among
+	// bookmarkable entries AND is immediately followed (by VolumeIndex) by an entry
+	// whose title appears multiple times. This reliably identifies Part/Book headings
+	// in EPUBs like 1984 where each Part contains chapters named "Chapter 1", etc.
+	//
+	// When no titles repeat, returns a single null-titled section (flat chapter list).
+	buildSections(
+		highlights: Highlight[],
+		allContents: Content[],
+	): BookSection[] {
+		if (highlights.length === 0) {
+			return [{ title: null, chapters: [] }];
+		}
+
+		// Count title occurrences among bookmarkable content entries.
+		const titleCount = new Map<string, number>();
+		for (const c of allContents) {
+			if (c.chapterIdBookmarked != null) {
+				titleCount.set(c.title, (titleCount.get(c.title) ?? 0) + 1);
+			}
+		}
+
+		const hasDuplicates = [...titleCount.values()].some((n) => n > 1);
+
+		if (!hasDuplicates) {
+			// No repeated chapter titles — return a flat, unsectioned chapter list.
+			const chapterMap = new Map<string, Bookmark[]>();
+			for (const h of highlights) {
+				if (!chapterMap.has(h.content.title))
+					chapterMap.set(h.content.title, []);
+				chapterMap.get(h.content.title)!.push(h.bookmark);
+			}
+			return [{ title: null, chapters: [...chapterMap.entries()] }];
+		}
+
+		const repeatedTitles = new Set(
+			[...titleCount.entries()]
+				.filter(([, n]) => n > 1)
+				.map(([t]) => t),
+		);
+
+		// Sort bookmarkable entries by VolumeIndex (nulls last), then contentId.
+		const sorted = allContents
+			.filter((c) => c.chapterIdBookmarked != null)
+			.sort((a, b) => {
+				if (a.volumeIndex != null && b.volumeIndex != null)
+					return a.volumeIndex - b.volumeIndex;
+				if (a.volumeIndex != null) return -1;
+				if (b.volumeIndex != null) return 1;
+				return a.contentId.localeCompare(b.contentId);
+			});
+
+		// Detect section headers and assign every content entry to its section.
+		const sectionHeaderTitles = new Set<string>();
+		const contentToSection = new Map<string, string | null>();
+		let currentSection: string | null = null;
+
+		for (let i = 0; i < sorted.length; i++) {
+			const entry = sorted[i];
+			const next = sorted[i + 1] ?? null;
+			const isUnique = !repeatedTitles.has(entry.title);
+			const nextIsRepeated =
+				next != null && repeatedTitles.has(next.title);
+
+			if (isUnique && nextIsRepeated) {
+				currentSection = entry.title;
+				sectionHeaderTitles.add(entry.title);
+			}
+
+			contentToSection.set(entry.contentId, currentSection);
+		}
+
+		// Group highlights into sections, preserving VolumeIndex-sorted order.
+		const sectionOrder: (string | null)[] = [];
+		const sectionChapters = new Map<string | null, Map<string, Bookmark[]>>();
+
+		for (const h of highlights) {
+			// Highlights whose content IS the section header are skipped — they
+			// have no chapter to belong to and are not meaningful to display.
+			if (sectionHeaderTitles.has(h.content.title)) continue;
+
+			const sectionKey =
+				contentToSection.get(h.content.contentId) ?? null;
+
+			if (!sectionChapters.has(sectionKey)) {
+				sectionOrder.push(sectionKey);
+				sectionChapters.set(sectionKey, new Map());
+			}
+
+			const chapterMap = sectionChapters.get(sectionKey)!;
+			if (!chapterMap.has(h.content.title))
+				chapterMap.set(h.content.title, []);
+			chapterMap.get(h.content.title)!.push(h.bookmark);
+		}
+
+		return sectionOrder.map((title) => ({
+			title,
+			chapters: [...(sectionChapters.get(title) ?? new Map()).entries()],
+		}));
 	}
 }

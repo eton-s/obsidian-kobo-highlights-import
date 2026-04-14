@@ -1,4 +1,10 @@
 /* eslint-disable no-unused-vars */
+
+export interface BookSection {
+	title: string | null; // null = no named section (book has no parts)
+	chapters: [string, Bookmark[]][];
+}
+
 export interface Bookmark {
 	bookmarkId: string;
 	text: string;
