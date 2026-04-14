@@ -8,7 +8,7 @@ export const DEFAULT_SETTINGS: KoboHighlightsImporterSettings = {
 	sortByChapterProgress: false,
 	templatePath: "",
 	appendTemplatePath: "",
-	sortByChapterOrder: true,
+	sortByChapterOrder: false,
 	importAllBooks: false,
 	sqlitePath: "",
 };
