@@ -27,7 +27,7 @@ timeSpentReading: <%= it.bookDetails.timeSpentReading ?? '' %>
 ## Highlights
 
 <% it.chapters.forEach(function([chapterName, highlights]) { -%>
-### <%= chapterName.trim() %>
+## <%= chapterName.trim() %>
 
 <% highlights.forEach(function(highlight) { -%>
 <%= highlight.text %>
@@ -37,7 +37,7 @@ timeSpentReading: <%= it.bookDetails.timeSpentReading ?? '' %>
 
 <% } -%>
 <% if (highlight.dateCreated) { -%>
-*<%= highlight.dateCreated.toISOString() %>*
+*Created: <%= highlight.dateCreated.toISOString() %>*
 
 <% } -%>
 <% }) -%>
@@ -48,7 +48,7 @@ export const defaultAppendTemplate = `
 ## Highlights
 
 <% it.chapters.forEach(function([chapterName, highlights]) { -%>
-### <%= chapterName.trim() %>
+## <%= chapterName.trim() %>
 
 <% highlights.forEach(function(highlight) { -%>
 <%= highlight.text %>
@@ -58,7 +58,7 @@ export const defaultAppendTemplate = `
 
 <% } -%>
 <% if (highlight.dateCreated) { -%>
-*<%= highlight.dateCreated.toISOString() %>*
+*Created: <%= highlight.dateCreated.toISOString() %>*
 
 <% } -%>
 <% }) -%>
